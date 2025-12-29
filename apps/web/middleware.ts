@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import jwt from "jsonwebtoken";
+import { jwtVerify } from "jose";
 
 const ROLE_HOME: Record<string, string> = {
   ADMIN: "/admin",
@@ -7,47 +7,47 @@ const ROLE_HOME: Record<string, string> = {
   STUDENT: "/student",
 };
 
-function getToken(req: NextRequest) {
-  const token = req.cookies.get("eduskill_token")?.value;
-  return token || null;
+function tokenFromCookie(req: NextRequest) {
+  return req.cookies.get("eduskill_token")?.value ?? null;
 }
 
-function decodeRole(req: NextRequest): string | null {
-  const token = getToken(req);
+async function roleFromToken(req: NextRequest): Promise<string | null> {
+  const token = tokenFromCookie(req);
   if (!token) return null;
 
   const secret = process.env.AUTH_SECRET;
   if (!secret) return null;
 
   try {
-    const payload = jwt.verify(token, secret) as any;
-    return payload?.role ?? null;
+    const { payload } = await jwtVerify(token, new TextEncoder().encode(secret));
+    return (payload as any)?.role ?? null;
   } catch {
     return null;
   }
 }
 
-export function middleware(req: NextRequest) {
+export async function middleware(req: NextRequest) {
   const { pathname } = req.nextUrl;
 
-  
+  // Public
   if (
     pathname.startsWith("/login") ||
     pathname.startsWith("/api/auth/login") ||
+    pathname.startsWith("/api/auth/logout") ||
     pathname.startsWith("/_next") ||
-    pathname.startsWith("/favicon.ico")
+    pathname === "/favicon.ico"
   ) {
     return NextResponse.next();
   }
 
-  const role = decodeRole(req);
-
-  const isProtected =
+  const protectedArea =
     pathname.startsWith("/admin") ||
     pathname.startsWith("/teacher") ||
     pathname.startsWith("/student");
 
-  if (isProtected && !role) {
+  const role = await roleFromToken(req);
+
+  if (protectedArea && !role) {
     const url = req.nextUrl.clone();
     url.pathname = "/login";
     url.searchParams.set("next", pathname);

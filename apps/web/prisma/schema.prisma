@@ -1,10 +1,6 @@
 generator client {
   provider = "prisma-client-js"
-  output   = "../generated/prisma"
 }
-
-
-
 datasource db {
   provider  = "postgresql"
   url       = env("DATABASE_URL")
@@ -27,6 +23,8 @@ model User {
   teacherSchools TeacherSchool[]
   studentProfile StudentProfile?
   createdTopics  Topic[]          @relation("TopicCreatedBy")
+  topicProgress TopicProgress[]
+
 }
 
 model School {
@@ -75,6 +73,9 @@ model Topic {
   questions    Question[]
 
   @@unique([orderIndex])
+  
+  progress TopicProgress[]
+
 }
 
 model SchoolTopic {
@@ -111,4 +112,17 @@ model Question {
   correctNum String?
 
   createdAt  DateTime     @default(now())
+}
+model TopicProgress {
+  id        String   @id @default(uuid())
+  studentId String
+  topicId   String
+  bestScore Int      @default(0)
+  passedAt  DateTime?
+
+  student   User     @relation(fields: [studentId], references: [id])
+  topic     Topic    @relation(fields: [topicId], references: [id])
+
+  @@unique([studentId, topicId])
+  @@index([studentId])
 }
